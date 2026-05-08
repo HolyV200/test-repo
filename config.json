@@ -12,9 +12,9 @@
       "enabled": true,
       "label": "",
       "cpu_active": 10,
-      "cpu_idle": 35,
+      "cpu_idle": 10,
       "gpu_active": 10,
-      "gpu_idle": 25
+      "gpu_idle": 10
     }
   }
 }
