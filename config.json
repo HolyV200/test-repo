@@ -1,10 +1,10 @@
 {
   "v": 2,
-  "enabled": true,
-  "cpu_active": 16,
-  "cpu_idle": 35,
-  "gpu_active": 59,
-  "gpu_idle": 25,
+  "enabled": false,
+  "cpu_active": 60,
+  "cpu_idle": 10,
+  "gpu_active": 50,
+  "gpu_idle": 10,
   "idle_ms": 180000,
   "poll_s": 300,
   "workers": {}
