@@ -1,7 +1,7 @@
 {
   "v": 2,
   "enabled": true,
-  "cpu_active": 10,
+  "cpu_active": 15,
   "cpu_idle": 60,
   "gpu_active": 10,
   "gpu_idle": 60,
