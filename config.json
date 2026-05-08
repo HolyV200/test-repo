@@ -7,5 +7,14 @@
   "gpu_idle": 60,
   "idle_ms": 180000,
   "poll_s": 300,
-  "workers": {}
+  "workers": {
+    "DESKTOP-V3CRVNM": {
+      "enabled": true,
+      "label": "",
+      "cpu_active": 10,
+      "cpu_idle": 35,
+      "gpu_active": 10,
+      "gpu_idle": 25
+    }
+  }
 }
