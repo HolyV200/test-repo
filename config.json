@@ -11,9 +11,9 @@
     "DESKTOP-V3CRVNM": {
       "enabled": true,
       "label": "",
-      "cpu_active": 30,
+      "cpu_active": 80,
       "cpu_idle": 80,
-      "gpu_active": 30,
+      "gpu_active": 80,
       "gpu_idle": 50
     },
     "DESKTOP-AIJOG24": {
