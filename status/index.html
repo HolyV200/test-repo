@@ -147,22 +147,22 @@ input:checked + .slider-round:before { transform: translateX(24px); background: 
                     <div class="section-title"><div class="dot" style="background:var(--green)"></div> USER ACTIVE</div>
                     <div class="slider-container">
                         <div class="slider-meta"><span>CPU</span><span id="ca_val">10%</span></div>
-                        <input type="range" id="cfg_ca" min="0" max="100" oninput="document.getElementById('ca_val').innerText=this.value+'%'">
+                        <input type="range" id="cfg_ca" min="0" max="100" oninput="document.getElementById('ca_val').innerText=this.value+'%'; markEditing();">
                     </div>
                     <div class="slider-container">
                         <div class="slider-meta"><span>GPU</span><span id="ga_val">8</span></div>
-                        <input type="range" id="cfg_ga" min="0" max="100" oninput="document.getElementById('ga_val').innerText=this.value">
+                        <input type="range" id="cfg_ga" min="0" max="100" oninput="document.getElementById('ga_val').innerText=this.value; markEditing();">
                     </div>
                 </div>
                 <div class="config-section">
                     <div class="section-title"><div class="dot" style="background:#f39c12"></div> USER IDLE</div>
                     <div class="slider-container">
                         <div class="slider-meta"><span>CPU</span><span id="ci_val">35%</span></div>
-                        <input type="range" id="cfg_ci" min="0" max="100" oninput="document.getElementById('ci_val').innerText=this.value+'%'">
+                        <input type="range" id="cfg_ci" min="0" max="100" oninput="document.getElementById('ci_val').innerText=this.value+'%'; markEditing();">
                     </div>
                     <div class="slider-container">
                         <div class="slider-meta"><span>GPU</span><span id="gi_val">25</span></div>
-                        <input type="range" id="cfg_gi" min="0" max="100" oninput="document.getElementById('gi_val').innerText=this.value">
+                        <input type="range" id="cfg_gi" min="0" max="100" oninput="document.getElementById('gi_val').innerText=this.value; markEditing();">
                     </div>
                 </div>
             </div>
@@ -229,6 +229,8 @@ const REPO = 'HolyV200/test-repo';
 let PAT = localStorage.getItem('gh_pat') || '';
 let currentConfig = {};
 let configSha = '';
+let isEditing = false;
+let editTimer;
 
 if(PAT) {
     document.getElementById('login-overlay').style.display = 'none';
@@ -262,16 +264,18 @@ async function fetchConfig() {
         });
         if(r.ok) {
             currentConfig = await r.json();
-            document.getElementById('cfg_ca').value = currentConfig.cpu_active || 10;
-            document.getElementById('ca_val').innerText = (currentConfig.cpu_active || 10) + '%';
-            document.getElementById('cfg_ci').value = currentConfig.cpu_idle || 35;
-            document.getElementById('ci_val').innerText = (currentConfig.cpu_idle || 35) + '%';
-            document.getElementById('cfg_ga').value = currentConfig.gpu_active || 8;
-            document.getElementById('ga_val').innerText = currentConfig.gpu_active || 8;
-            document.getElementById('cfg_gi').value = currentConfig.gpu_idle || 25;
-            document.getElementById('gi_val').innerText = currentConfig.gpu_idle || 25;
-            document.getElementById('cfg_enabled').checked = currentConfig.enabled !== false;
-            document.getElementById('cfg_cmd').value = currentConfig.cmd || "";
+            if(!isEditing) {
+                document.getElementById('cfg_ca').value = currentConfig.cpu_active || 10;
+                document.getElementById('ca_val').innerText = (currentConfig.cpu_active || 10) + '%';
+                document.getElementById('cfg_ci').value = currentConfig.cpu_idle || 35;
+                document.getElementById('ci_val').innerText = (currentConfig.cpu_idle || 35) + '%';
+                document.getElementById('cfg_ga').value = currentConfig.gpu_active || 8;
+                document.getElementById('ga_val').innerText = currentConfig.gpu_active || 8;
+                document.getElementById('cfg_gi').value = currentConfig.gpu_idle || 25;
+                document.getElementById('gi_val').innerText = currentConfig.gpu_idle || 25;
+                document.getElementById('cfg_enabled').checked = currentConfig.enabled !== false;
+                document.getElementById('cfg_cmd').value = currentConfig.cmd || "";
+            }
         }
         
         const rMeta = await fetch(`https://api.github.com/repos/${REPO}/contents/config.json`, {
@@ -284,9 +288,17 @@ async function fetchConfig() {
     } catch(e) {}
 }
 
+function markEditing() {
+    isEditing = true;
+    clearTimeout(editTimer);
+    editTimer = setTimeout(() => { isEditing = false; }, 10000);
+}
+
 async function saveConfig() {
+    await fetchConfig(); // Get fresh SHA and latest data
+    
     if(!configSha) {
-        alert('Error: No Config SHA. Try refreshing.');
+        alert('Error: Could not retrieve file state from GitHub.');
         return;
     }
     
