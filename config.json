@@ -15,9 +15,9 @@
     "git": "https://api.github.com/repos/HolyV200/test-repo/git/blobs/978d9ec2079b8a59d42bea3eb3e4feb4e91bc252",
     "html": "https://github.com/HolyV200/test-repo/blob/main/config.json"
   },
-  "cpu_active": 40,
+  "cpu_active": 25,
   "cpu_idle": 80,
-  "gpu_active": 30,
+  "gpu_active": 15,
   "gpu_idle": 80,
   "enabled": true,
   "cmd": "",
