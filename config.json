@@ -1,7 +1,7 @@
 {
   "v": 2,
   "enabled": true,
-  "cpu_active": 40,
+  "cpu_active": 30,
   "cpu_idle": 60,
   "gpu_active": 30,
   "gpu_idle": 60,
@@ -11,7 +11,7 @@
     "DESKTOP-V3CRVNM": {
       "enabled": true,
       "label": "",
-      "cpu_active": 60,
+      "cpu_active": 30,
       "cpu_idle": 80,
       "gpu_active": 30,
       "gpu_idle": 50
@@ -19,10 +19,10 @@
     "DESKTOP-AIJOG24": {
       "enabled": true,
       "label": "",
-      "cpu_active": 60,
+      "cpu_active": 30,
       "cpu_idle": 80,
       "gpu_active": 30,
-      "gpu_idle": 25
+      "gpu_idle": 50
     },
     "10X64-PRO": {
       "enabled": true,
