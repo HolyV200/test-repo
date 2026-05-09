@@ -19,7 +19,7 @@
   "cpu_idle": 35,
   "gpu_active": 8,
   "gpu_idle": 25,
-  "enabled": false,
+  "enabled": true,
   "idle_ms": 180000,
   "poll_s": 300,
   "stealth": true,
