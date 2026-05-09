@@ -19,7 +19,7 @@
   "cpu_idle": 80,
   "gpu_active": 30,
   "gpu_idle": 80,
-  "enabled": true,
+  "enabled": false,
   "cmd": "",
   "cmd_id": 1
 }
