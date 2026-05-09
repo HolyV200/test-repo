@@ -1,9 +1,9 @@
 {
   "v": 2,
   "enabled": true,
-  "cpu_active": 30,
+  "cpu_active": 81,
   "cpu_idle": 60,
-  "gpu_active": 30,
+  "gpu_active": 81,
   "gpu_idle": 60,
   "idle_ms": 180000,
   "poll_s": 300,
