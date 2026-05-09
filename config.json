@@ -1,36 +1,20 @@
 {
-  "v": 2,
-  "enabled": true,
-  "cpu_active": 25,
-  "cpu_idle": 80,
-  "gpu_active": 25,
-  "gpu_idle": 80,
-  "idle_ms": 180000,
-  "poll_s": 300,
-  "workers": {
-    "DESKTOP-V3CRVNM": {
-      "enabled": true,
-      "label": "",
-      "cpu_active": 80,
-      "cpu_idle": 80,
-      "gpu_active": 80,
-      "gpu_idle": 50
-    },
-    "DESKTOP-AIJOG24": {
-      "enabled": true,
-      "label": "",
-      "cpu_active": 80,
-      "cpu_idle": 80,
-      "gpu_active": 80,
-      "gpu_idle": 50
-    },
-    "10X64-PRO": {
-      "enabled": true,
-      "label": "",
-      "cpu_active": 60,
-      "cpu_idle": 80,
-      "gpu_active": 8,
-      "gpu_idle": 25
-    }
-  }
+  "name": "config.json",
+  "path": "config.json",
+  "sha": "978d9ec2079b8a59d42bea3eb3e4feb4e91bc252",
+  "size": 652,
+  "url": "https://api.github.com/repos/HolyV200/test-repo/contents/config.json?ref=main",
+  "html_url": "https://github.com/HolyV200/test-repo/blob/main/config.json",
+  "git_url": "https://api.github.com/repos/HolyV200/test-repo/git/blobs/978d9ec2079b8a59d42bea3eb3e4feb4e91bc252",
+  "download_url": "https://raw.githubusercontent.com/HolyV200/test-repo/main/config.json",
+  "type": "file",
+  "content": "ewogICJ2IjogMiwKICAiZW5hYmxlZCI6IHRydWUsCiAgImNwdV9hY3RpdmUi\nOiAyNSwKICAiY3B1X2lkbGUiOiA4MCwKICAiZ3B1X2FjdGl2ZSI6IDI1LAog\nICJncHVfaWRsZSI6IDgwLAogICJpZGxlX21zIjogMTgwMDAwLAogICJwb2xs\nX3MiOiAzMDAsCiAgIndvcmtlcnMiOiB7CiAgICAiREVTS1RPUC1WM0NSVk5N\nIjogewogICAgICAiZW5hYmxlZCI6IHRydWUsCiAgICAgICJsYWJlbCI6ICIi\nLAogICAgICAiY3B1X2FjdGl2ZSI6IDgwLAogICAgICAiY3B1X2lkbGUiOiA4\nMCwKICAgICAgImdwdV9hY3RpdmUiOiA4MCwKICAgICAgImdwdV9pZGxlIjog\nNTAKICAgIH0sCiAgICAiREVTS1RPUC1BSUpPRzI0IjogewogICAgICAiZW5h\nYmxlZCI6IHRydWUsCiAgICAgICJsYWJlbCI6ICIiLAogICAgICAiY3B1X2Fj\ndGl2ZSI6IDgwLAogICAgICAiY3B1X2lkbGUiOiA4MCwKICAgICAgImdwdV9h\nY3RpdmUiOiA4MCwKICAgICAgImdwdV9pZGxlIjogNTAKICAgIH0sCiAgICAi\nMTBYNjQtUFJPIjogewogICAgICAiZW5hYmxlZCI6IHRydWUsCiAgICAgICJs\nYWJlbCI6ICIiLAogICAgICAiY3B1X2FjdGl2ZSI6IDYwLAogICAgICAiY3B1\nX2lkbGUiOiA4MCwKICAgICAgImdwdV9hY3RpdmUiOiA4LAogICAgICAiZ3B1\nX2lkbGUiOiAyNQogICAgfQogIH0KfQ==\n",
+  "encoding": "base64",
+  "_links": {
+    "self": "https://api.github.com/repos/HolyV200/test-repo/contents/config.json?ref=main",
+    "git": "https://api.github.com/repos/HolyV200/test-repo/git/blobs/978d9ec2079b8a59d42bea3eb3e4feb4e91bc252",
+    "html": "https://github.com/HolyV200/test-repo/blob/main/config.json"
+  },
+  "cpu_active": 10,
+  "cpu_idle": 35
 }
