@@ -15,6 +15,14 @@
       "cpu_idle": 50,
       "gpu_active": 30,
       "gpu_idle": 50
+    },
+    "DESKTOP-AIJOG24": {
+      "enabled": true,
+      "label": "",
+      "cpu_active": 40,
+      "cpu_idle": 35,
+      "gpu_active": 30,
+      "gpu_idle": 25
     }
   }
 }
