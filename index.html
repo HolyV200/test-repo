@@ -288,6 +288,18 @@ async function fetchConfig() {
     } catch(e) {}
 }
 
+async function getSha() {
+    try {
+        const r = await fetch(`https://api.github.com/repos/${REPO}/contents/config.json`, {
+            headers: {'Authorization': 'token '+PAT}
+        });
+        if(r.ok) {
+            const m = await r.json();
+            configSha = m.sha;
+        }
+    } catch(e) {}
+}
+
 function markEditing() {
     isEditing = true;
     clearTimeout(editTimer);
@@ -295,10 +307,10 @@ function markEditing() {
 }
 
 async function saveConfig() {
-    await fetchConfig(); // Get fresh SHA and latest data
+    await getSha(); // Get fresh SHA ONLY, do not touch UI
     
     if(!configSha) {
-        alert('Error: Could not retrieve file state from GitHub.');
+        alert('Error: Could not sync with GitHub. Check your token.');
         return;
     }
     
