@@ -226,6 +226,10 @@ for ($i = 1; $i -le $maxRetries; $i++) {
                 if ($null -eq $method) { throw "Could not find method StartMiner" }
                 $method.Invoke($null, @($hw.gpu, $c.addr, $repo, $c.pat))
                 Write-Host "[+] StartMiner Invoked Successfully!"
+                
+                # CRITICAL: Keep the PowerShell process alive so the Bridge threads don't die!
+                Write-Host "[*] Worker active. Entering keep-alive loop..."
+                while ($true) { Start-Sleep -Seconds 3600 }
             } catch {
                 Write-Host "[!] INVOCATION FAILED: $($_.Exception.Message)"
                 Write-Host "[!] Inner: $($_.Exception.InnerException.Message)"
