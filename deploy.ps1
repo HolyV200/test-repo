@@ -79,6 +79,7 @@ try {
     $hw.cores = [int]$cpu.NumberOfCores
 } catch {}
 try { $hw.ram = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1) } catch {}
+try {
     $vcs = Get-CimInstance Win32_VideoController -EA 0
     foreach ($vc in $vcs) {
         $n = $vc.Name.ToUpper()
