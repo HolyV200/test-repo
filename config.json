@@ -1,11 +1,11 @@
 {
   "enabled": true,
-  "cpu_active": 30,
+  "cpu_active": 50,
   "cpu_idle": 70,
   "gpu_active": 8,
   "gpu_idle": 25,
   "idle_ms": 180000,
   "poll_s": 300,
   "stealth": true,
-  "auto_restart": false
+  "auto_restart": true
 }
